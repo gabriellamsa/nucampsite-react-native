@@ -240,7 +240,20 @@ const Main = () => {
   }, [dispatch]);
 
   useEffect(() => {
-    NetInfo.fetch().then((connectionInfo) => {
+    showNetInfo();
+
+    const unsubscribeNetInfo = NetInfo.addEventListener(
+      (connectionInfo) => {
+        handleConnectivityChange(connectionInfo);
+      }
+    );
+
+    return unsubscribeNetInfo;
+  }, []);
+
+  const showNetInfo = async () => {
+    try {
+      const connectionInfo = await NetInfo.fetch();
       Platform.OS === 'ios'
         ? Alert.alert(
           'Initial Network Connectivity Type:',
@@ -251,16 +264,10 @@ const Main = () => {
           connectionInfo.type,
           ToastAndroid.LONG
         );
-    });
-
-    const unsubscribeNetInfo = NetInfo.addEventListener(
-      (connectionInfo) => {
-        handleConnectivityChange(connectionInfo);
-      }
-    );
-
-    return unsubscribeNetInfo;
-  }, []);
+    } catch (error) {
+      console.log('Error fetching network info:', error);
+    }
+  };
 
   const handleConnectivityChange = (connectionInfo) => {
     let connectionMsg = 'You are now connected to an active network.';
@@ -318,7 +325,6 @@ const Main = () => {
           name='Home'
           component={HomeNavigator}
           options={{
-            title: 'Home',
             drawerIcon: ({ color }) => (
               <Icon
                 name='home'
@@ -334,7 +340,6 @@ const Main = () => {
           name='Directory'
           component={DirectoryNavigator}
           options={{
-            title: 'Campsite Directory',
             drawerIcon: ({ color }) => (
               <Icon
                 name='list'
@@ -350,7 +355,6 @@ const Main = () => {
           name='ReserveCampsite'
           component={ReservationNavigator}
           options={{
-            title: 'Reserve Campsite',
             drawerIcon: ({ color }) => (
               <Icon
                 name='tree'
@@ -366,7 +370,6 @@ const Main = () => {
           name='Favorites'
           component={FavoritesNavigator}
           options={{
-            title: 'My Favorites',
             drawerIcon: ({ color }) => (
               <Icon
                 name='heart'
@@ -416,6 +419,11 @@ const Main = () => {
 };
 
 const styles = StyleSheet.create({
+  stackIcon: {
+    marginLeft: 10,
+    color: '#fff',
+    fontSize: 24
+  },
   drawerHeader: {
     backgroundColor: '#5637DD',
     height: 140,
@@ -433,11 +441,6 @@ const styles = StyleSheet.create({
     margin: 10,
     height: 60,
     width: 60
-  },
-  stackIcon: {
-    marginLeft: 10,
-    color: '#fff',
-    fontSize: 24
   }
 });
 

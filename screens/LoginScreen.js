@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, Image } from 'react-native';
+import { View, StyleSheet, ScrollView, Image, Text } from 'react-native';
 import { CheckBox, Input, Button, Icon } from 'react-native-elements';
 import * as SecureStore from 'expo-secure-store';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { baseUrl } from '../shared/baseUrl';
 import logo from '../assets/images/logo.png';
 
@@ -12,34 +13,47 @@ const LoginTab = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     console.log('username:', username);
     console.log('password:', password);
     console.log('remember:', remember);
     if (remember) {
-      SecureStore.setItemAsync(
-        'userinfo',
-        JSON.stringify({
-          username,
-          password
-        })
-      ).catch((error) => console.log('Could not save user info', error));
+      try {
+        await SecureStore.setItemAsync(
+          'userinfo',
+          JSON.stringify({
+            username,
+            password
+          })
+        );
+      } catch (error) {
+        console.log('Could not save user info', error);
+      }
     } else {
-      SecureStore.deleteItemAsync('userinfo').catch((error) =>
-        console.log('Could not delete user info', error)
-      );
+      try {
+        await SecureStore.deleteItemAsync('userinfo');
+      } catch (error) {
+        console.log('Could not delete user info', error);
+      }
     }
   };
 
   useEffect(() => {
-    SecureStore.getItemAsync('userinfo').then((userdata) => {
-      const userinfo = JSON.parse(userdata);
-      if (userinfo) {
-        setUsername(userinfo.username);
-        setPassword(userinfo.password);
-        setRemember(true);
+    const fetchUserInfo = async () => {
+      try {
+        const userdata = await SecureStore.getItemAsync('userinfo');
+        const userinfo = JSON.parse(userdata);
+        if (userinfo) {
+          setUsername(userinfo.username);
+          setPassword(userinfo.password);
+          setRemember(true);
+        }
+      } catch (error) {
+        console.log('Could not fetch user info', error);
       }
-    });
+    };
+
+    fetchUserInfo();
   }, []);
 
   return (
@@ -59,6 +73,7 @@ const LoginTab = ({ navigation }) => {
         value={password}
         containerStyle={styles.formInput}
         leftIconContainerStyle={styles.formIcon}
+        secureTextEntry={true}
       />
       <CheckBox
         title='Remember Me'
@@ -71,7 +86,7 @@ const LoginTab = ({ navigation }) => {
         <Button
           onPress={() => handleLogin()}
           title='Login'
-          color='#5637DD'
+          buttonStyle={{ backgroundColor: '#5637DD' }}
           icon={
             <Icon
               name='sign-in'
@@ -80,7 +95,6 @@ const LoginTab = ({ navigation }) => {
               iconStyle={{ marginRight: 10 }}
             />
           }
-          buttonStyle={{ backgroundColor: '#5637DD' }}
         />
       </View>
       <View style={styles.formButton}>
@@ -112,7 +126,7 @@ const RegisterTab = () => {
   const [remember, setRemember] = useState(false);
   const [imageUrl, setImageUrl] = useState(baseUrl + 'images/logo.png');
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     const userInfo = {
       username,
       password,
@@ -123,23 +137,28 @@ const RegisterTab = () => {
     };
     console.log(JSON.stringify(userInfo));
     if (remember) {
-      SecureStore.setItemAsync(
-        'userinfo',
-        JSON.stringify({
-          username,
-          password
-        })
-      ).catch((error) => console.log('Could not save user info', error));
+      try {
+        await SecureStore.setItemAsync(
+          'userinfo',
+          JSON.stringify({
+            username,
+            password
+          })
+        );
+      } catch (error) {
+        console.log('Could not save user info', error);
+      }
     } else {
-      SecureStore.deleteItemAsync('userinfo').catch((error) =>
-        console.log('Could not delete user info', error)
-      );
+      try {
+        await SecureStore.deleteItemAsync('userinfo');
+      } catch (error) {
+        console.log('Could not delete user info', error);
+      }
     }
   };
 
   const getImageFromCamera = async () => {
-    const cameraPermission =
-      await ImagePicker.requestCameraPermissionsAsync();
+    const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
 
     if (cameraPermission.status === 'granted') {
       const capturedImage = await ImagePicker.launchCameraAsync({
@@ -147,8 +166,36 @@ const RegisterTab = () => {
         aspect: [1, 1]
       });
       if (capturedImage.assets) {
-        console.log(capturedImage.assets[0]);
-        setImageUrl(capturedImage.assets[0].uri);
+        await processImage(capturedImage.assets[0].uri);
+      }
+    }
+  };
+
+  const processImage = async (imgUri) => {
+    try {
+      const processedImage = await ImageManipulator.manipulateAsync(
+        imgUri,
+        [{ resize: { width: 400, height: 400 } }],
+        { compress: 1, format: ImageManipulator.SaveFormat.PNG }
+      );
+      console.log(processedImage);
+      setImageUrl(processedImage.uri);
+    } catch (error) {
+      console.log('Error processing image', error);
+    }
+  };
+
+  const getImageFromGallery = async () => {
+    const mediaLibraryPermissions = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (mediaLibraryPermissions.status === 'granted') {
+      const selectedImage = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        aspect: [1, 1]
+      });
+      if (selectedImage.assets) {
+        console.log(selectedImage.assets[0]);
+        await processImage(selectedImage.assets[0].uri);
       }
     }
   };
@@ -163,6 +210,7 @@ const RegisterTab = () => {
             style={styles.image}
           />
           <Button title='Camera' onPress={getImageFromCamera} />
+          <Button title='Gallery' onPress={getImageFromGallery} />
         </View>
         <Input
           placeholder='Username'
@@ -179,6 +227,7 @@ const RegisterTab = () => {
           value={password}
           containerStyle={styles.formInput}
           leftIconContainerStyle={styles.formIcon}
+          secureTextEntry={true}
         />
         <Input
           placeholder='First Name'
@@ -215,7 +264,7 @@ const RegisterTab = () => {
           <Button
             onPress={() => handleRegister()}
             title='Register'
-            color='#5637DD'
+            buttonStyle={{ backgroundColor: '#5637DD' }}
             icon={
               <Icon
                 name='user-plus'
@@ -224,7 +273,6 @@ const RegisterTab = () => {
                 iconStyle={{ marginRight: 10 }}
               />
             }
-            buttonStyle={{ backgroundColor: '#5637DD' }}
           />
         </View>
       </View>
@@ -235,44 +283,34 @@ const RegisterTab = () => {
 const Tab = createBottomTabNavigator();
 
 const LoginScreen = () => {
-  const tabBarOptions = {
-    activeBackgroundColor: '#5637DD',
-    inactiveBackgroundColor: '#CEC8FF',
-    activeTintColor: '#fff',
-    inactiveTintColor: '#808080',
-    labelStyle: { fontSize: 16 }
-  };
-
   return (
-    <Tab.Navigator tabBarOptions={tabBarOptions}>
+    <Tab.Navigator>
       <Tab.Screen
         name='Login'
         component={LoginTab}
         options={{
-          tabBarIcon: (props) => {
-            return (
-              <Icon
-                name='sign-in'
-                type='font-awesome'
-                color={props.color}
-              />
-            );
-          }
+          tabBarIcon: (props) => (
+            <Icon
+              name='sign-in'
+              type='font-awesome'
+              color={props.color}
+              iconStyle={{ marginRight: 10 }}
+            />
+          )
         }}
       />
       <Tab.Screen
         name='Register'
         component={RegisterTab}
         options={{
-          tabBarIcon: (props) => {
-            return (
-              <Icon
-                name='user-plus'
-                type='font-awesome'
-                color={props.color}
-              />
-            );
-          }
+          tabBarIcon: (props) => (
+            <Icon
+              name='user-plus'
+              type='font-awesome'
+              color={props.color}
+              iconStyle={{ marginRight: 10 }}
+            />
+          )
         }}
       />
     </Tab.Navigator>
@@ -282,23 +320,7 @@ const LoginScreen = () => {
 const styles = StyleSheet.create({
   container: {
     justifyContent: 'center',
-    margin: 10
-  },
-  formIcon: {
-    marginRight: 10
-  },
-  formInput: {
-    padding: 8,
-    height: 60
-  },
-  formCheckbox: {
-    margin: 8,
-    backgroundColor: null
-  },
-  formButton: {
-    margin: 20,
-    marginRight: 40,
-    marginLeft: 40
+    margin: 20
   },
   imageContainer: {
     flex: 1,
@@ -310,6 +332,19 @@ const styles = StyleSheet.create({
   image: {
     width: 60,
     height: 60
+  },
+  formIcon: {
+    marginRight: 10
+  },
+  formInput: {
+    padding: 10
+  },
+  formCheckbox: {
+    margin: 10,
+    backgroundColor: null
+  },
+  formButton: {
+    margin: 40
   }
 });
 
